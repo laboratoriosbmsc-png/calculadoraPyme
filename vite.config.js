@@ -7,4 +7,7 @@ export default defineConfig({
   server: {
     allowedHosts: ['small-cycles-rush.loca.lt'],
   },
+  preview: {
+    allowedHosts: ['calculadorapyme.onrender.com'],
+  },
 })
