@@ -61,6 +61,8 @@ export function useSolicitudes() {
   if (!context) throw new Error('useSolicitudes requiere SolicitudesProvider')
   const email = getSession()?.email
   const solicitudesPropias = context.solicitudes.filter((item) => item.propietarioEmail === email)
+
+  
   return { ...context, solicitudesPropias }
 }
 
