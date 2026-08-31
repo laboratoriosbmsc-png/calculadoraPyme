@@ -1,5 +1,5 @@
 import { ArrowLeft, Calculator, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Modal from '../../components/Modal'
 import { useSolicitud } from '../../hooks/useSolicitudes'
@@ -20,10 +20,7 @@ export default function PlanPagosPage() {
   const [errors, setErrors] = useState({})
   const [dirty, setDirty] = useState(false)
   const [resultOpen, setResultOpen] = useState(false)
-  const table = useMemo(
-    () => solicitud?.planPagos?.tabla || generarTablaDemo(solicitud?.planPagos?.campos?.plazoAnios, solicitud?.planPagos?.campos?.formaAmortizacion),
-    [solicitud?.planPagos],
-  )
+  const table = solicitud?.planPagos?.tabla || []
   useUnsavedWarning(dirty)
   if (!solicitud) return <Missing />
 
