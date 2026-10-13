@@ -7,6 +7,7 @@ import NuevaSolicitudModal from '../../components/NuevaSolicitudModal'
 import StatusBadge from '../../components/StatusBadge'
 import { useSolicitudes } from '../../hooks/useSolicitudes'
 import { formatDate, getResultadoCargaFinanciera } from '../../services/calculos'
+import { nombreReferenciaDuplicado } from '../../services/nombreReferencia'
 
 export default function SolicitudesPage() {
   const [newOpen, setNewOpen] = useState(false)
@@ -69,8 +70,8 @@ export default function SolicitudesPage() {
     }
     setSharePdf(null)
     if (window.matchMedia('(max-width: 900px)').matches) {
-      import('../../services/informePdf').then(({ createInformePdf }) => {
-        const { blob, fileName } = createInformePdf(item)
+      import('../../services/informePdf').then(async ({ createInformePdf }) => {
+        const { blob, fileName } = await createInformePdf(item)
         setSharePdf({ itemId: item.id, file: new File([blob], fileName, { type: 'application/pdf' }) })
       }).catch(() => setShareNotice('No se pudo preparar el PDF. Inténtalo de nuevo.'))
     }
@@ -129,6 +130,7 @@ export default function SolicitudesPage() {
     if (!clean) return setEditError('El nombre es obligatorio.')
     if (clean.length > 50) return setEditError('El nombre no puede superar los 50 caracteres.')
     if (!/^[\p{L}\p{N} .,'&()-]+$/u.test(clean)) return setEditError('Usa únicamente letras, números y signos comunes.')
+    if (nombreReferenciaDuplicado(solicitudesPropias, clean, editTarget.id)) return setEditError('Ya existe una solicitud con ese nombre. Usa otro nombre.')
     if (updateSolicitud(editTarget.id, { nombreReferencia: clean })) setEditTarget(null)
   }
 
@@ -139,7 +141,7 @@ export default function SolicitudesPage() {
 
   return (
     <div className="page-container">
-      <header className="page-heading"><div><span className="eyebrow">Evaluaciones</span><h1>Solicitudes</h1><p>Gestiona los análisis registrados para tus clientes.</p></div><button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={19} />Nueva solicitud</button></header>
+      <header className="page-heading"><div><h1>Solicitudes</h1><p>Gestiona los análisis registrados para tus clientes.</p></div><button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={19} />Nueva solicitud</button></header>
       {shareNotice && <div className="share-report-notice" role="status">{shareNotice}</div>}
       <div className="toolbar surface"><div className="search-box"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre de referencia" aria-label="Buscar solicitudes" /></div><span className="result-count">{filtered.length} {filtered.length === 1 ? 'solicitud' : 'solicitudes'}</span></div>
       {filtered.length ? (
@@ -149,7 +151,7 @@ export default function SolicitudesPage() {
               <colgroup><col className="request-client-column" /><col /></colgroup>
               <thead><tr><th>Solicitud</th><th>Secciones</th></tr></thead>
               <tbody>{visibleRequests.map((item) => <tr key={item.id}>
-                <td><div className="request-table-identity"><span className="reference-avatar large-avatar">{item.nombreReferencia.slice(0, 2).toUpperCase()}</span><div><button type="button" className="request-name-button" onClick={() => setSectionsTarget(item)}>{item.nombreReferencia}</button><small><Pencil size={10} aria-hidden="true" />{formatDate(item.fechaActualizacion)}</small></div></div></td>
+                <td><div className="request-table-identity"><div><button type="button" className="request-name-button" onClick={() => setSectionsTarget(item)}>{item.nombreReferencia}</button><small><Pencil size={10} aria-hidden="true" />{formatDate(item.fechaActualizacion)}</small></div></div></td>
                 <td><div className="request-sections-cell"><RequestSectionLinks item={item} /><div className="card-menu-container request-actions-menu">
                     <button type="button" className="icon-button card-menu-trigger" onClick={(event) => toggleActionsMenu(item, event)} aria-label={`Opciones de ${item.nombreReferencia}`} aria-expanded={menuOpenId === item.id} aria-haspopup="menu"><Ellipsis size={20} /></button>
                     {menuOpenId === item.id && menuPosition && createPortal(<div className="card-menu-popover request-actions-popover" role="menu" style={menuPosition}>

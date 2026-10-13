@@ -59,7 +59,7 @@ export default function BalanceGeneralPage() {
   return (
     <div className="page-container form-page">
       <Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link>
-      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Balance General</h1><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.balanceGeneral ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
+      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Balance General</h1><span className={`draft-label ${!dirty && solicitud.balanceGeneral ? 'completed' : ''}`}>{dirty ? 'Cambios sin guardar' : solicitud.balanceGeneral ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
       {saved && <SaveToast onDismiss={setSaved} />}
       <form onSubmit={submit} noValidate>
         <BalanceSection number="01" title="Activos" description="Registra los recursos y bienes de la empresa." fields={BALANCE_ACTIVOS_FIELDS} campos={campos} errors={errors} onChange={change} />

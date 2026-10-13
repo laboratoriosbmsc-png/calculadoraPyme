@@ -10,9 +10,15 @@ const navigation = [
   { to: '/solicitudes', label: 'Solicitudes', icon: FileText },
 ]
 
+function isInstalledPwa() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true
+}
+
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
+  const [installedPwa, setInstalledPwa] = useState(isInstalledPwa)
   const lastScrollY = useRef(0)
   const navigate = useNavigate()
   const location = useLocation()
@@ -26,6 +32,15 @@ export default function AppLayout() {
     setHeaderHidden(false)
     lastScrollY.current = window.scrollY
   }, [location.pathname])
+
+  useEffect(() => {
+    const standalone = window.matchMedia('(display-mode: standalone)')
+    const refreshInstalledState = () => setInstalledPwa(isInstalledPwa())
+    standalone.addEventListener('change', refreshInstalledState)
+    return () => {
+      standalone.removeEventListener('change', refreshInstalledState)
+    }
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,7 +77,7 @@ export default function AppLayout() {
         <div className="brand"><span className="brand-mark"><Calculator /></span><div><strong>Calculadora</strong><em>Pyme</em></div></div>
         <nav aria-label="Navegación principal">
           {navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMenuOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={20} />{label}</NavLink>)}
-          <button type="button" className="nav-link nav-action" onClick={() => { setMenuOpen(false); void checkForUpdates({ manual: true }) }} disabled={checking}><RefreshCw size={20} />{checking ? 'Buscando actualizaciones…' : 'Buscar actualizaciones'}</button>
+          {installedPwa && <button type="button" className="nav-link nav-action" onClick={() => { setMenuOpen(false); void checkForUpdates({ manual: true }) }} disabled={checking}><RefreshCw size={20} />{checking ? 'Buscando actualizaciones…' : 'Buscar actualizaciones'}</button>}
         </nav>
         <div className="sidebar-user">
           <div className="avatar">{initials}</div>

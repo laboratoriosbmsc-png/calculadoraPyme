@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { getSession } from '../services/auth'
+import { nombreReferenciaDuplicado } from '../services/nombreReferencia'
 import { loadSolicitudes, saveSolicitudes } from '../storage/solicitudes'
 
 const SolicitudesContext = createContext(null)
@@ -25,10 +26,12 @@ export function SolicitudesProvider({ children }) {
     storageError,
     clearStorageError: () => setStorageError(''),
     createSolicitud(nombreReferencia) {
+      const email = getSession()?.email
+      if (nombreReferenciaDuplicado(solicitudes.filter((item) => item.propietarioEmail === email), nombreReferencia)) return null
       const now = new Date().toISOString()
       const solicitud = {
         id: crypto.randomUUID(),
-        propietarioEmail: getSession()?.email,
+        propietarioEmail: email,
         nombreReferencia: nombreReferencia.trim(),
         fechaCreacion: now,
         fechaActualizacion: now,
@@ -41,6 +44,9 @@ export function SolicitudesProvider({ children }) {
     },
     updateSolicitud(id, changes) {
       const email = getSession()?.email
+      if (typeof changes.nombreReferencia === 'string' && nombreReferenciaDuplicado(
+        solicitudes.filter((item) => item.propietarioEmail === email), changes.nombreReferencia, id,
+      )) return false
       const next = solicitudes.map((item) => item.id === id && item.propietarioEmail === email
         ? { ...item, ...changes, fechaActualizacion: new Date().toISOString() }
         : item)

@@ -1,4 +1,5 @@
 import { ArrowLeft, Calculator, CheckCircle2, Printer, XCircle } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { calcularLimiteFinanciamientoBalance, formatDate, formatIndex, formatMoney, getResultadoCargaFinanciera } from '../../services/calculos'
@@ -7,12 +8,46 @@ import { BALANCE_ACTIVOS_FIELDS, BALANCE_PASIVOS_FIELDS, FLUJO_FIELDS, PLAN_FIEL
 export default function InformePage() {
   const { id } = useParams()
   const { solicitud } = useSolicitud(id)
+  const [pdfError, setPdfError] = useState('')
   if (!solicitud) return <div className="report-page"><div className="empty-state"><h1>Solicitud no encontrada</h1><Link className="button primary" to="/solicitudes">Volver</Link></div></div>
+
+  const openPdf = async () => {
+    setPdfError('')
+    const preview = window.open('', '_blank')
+    if (preview) preview.document.body.textContent = 'Preparando informe PDF…'
+    try {
+      const { createInformePdf } = await import('../../services/informePdf')
+      const { blob, fileName } = await createInformePdf(solicitud)
+      const url = URL.createObjectURL(blob)
+      if (preview) preview.location.replace(url)
+      else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000)
+    } catch {
+      preview?.close()
+      setPdfError('No se pudo generar el PDF. Inténtalo de nuevo.')
+    }
+  }
+
+  return (
+    <main className="report-page">
+      <div className="report-toolbar no-print"><Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link><button type="button" className="button primary" onClick={openPdf}><Printer size={18} />Imprimir o guardar PDF</button></div>
+      {pdfError && <p className="report-pdf-error" role="alert">{pdfError}</p>}
+      <ReportSheet solicitud={solicitud} />
+    </main>
+  )
+}
+
+export function ReportSheet({ solicitud }) {
   const resultadoFlujo = getResultadoCargaFinanciera(solicitud.flujoCaja)
   const cargaPorcentaje = typeof solicitud.flujoCaja?.cargaFinanciera === 'number' ? solicitud.flujoCaja.cargaFinanciera : null
   return (
-    <main className="report-page">
-      <div className="report-toolbar no-print"><Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link><button type="button" className="button primary" onClick={() => window.print()}><Printer size={18} />Imprimir o guardar PDF</button></div>
       <article className="report-sheet">
         <header className="report-header"><div className="report-brand"><span><Calculator /></span><strong>Calculadora <em>Pyme</em></strong></div><div><span>INFORME DE EVALUACIÓN</span></div></header>
         <section className="report-title"><span className="eyebrow">Solicitud Pyme</span><h1>{solicitud.nombreReferencia}</h1><div><span><small>Fecha de creación</small>{formatDate(solicitud.fechaCreacion)}</span><span><small>Última actualización</small>{formatDate(solicitud.fechaActualizacion)}</span></div></section>
@@ -30,7 +65,6 @@ export default function InformePage() {
         </ReportSection>
         <footer className="report-footer"><span>Calculadora Pyme · Uso interno</span></footer>
       </article>
-    </main>
   )
 }
 

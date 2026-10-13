@@ -65,7 +65,7 @@ export default function PlanPagosPage() {
   return (
     <div className="page-container form-page">
       <Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link>
-      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Plan de Pagos</h1><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.planPagos ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
+      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Plan de Pagos</h1><span className={`draft-label ${!dirty && solicitud.planPagos ? 'completed' : ''}`}>{dirty ? 'Cambios sin guardar' : solicitud.planPagos ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
       {saved && <SaveToast onDismiss={setSaved} />}
       <form onSubmit={submit} noValidate>
         <section className="form-section surface"><div className="form-section-heading"><span>01</span><div><h2>Condiciones del financiamiento</h2><p>Todos los campos son obligatorios.</p></div></div>
