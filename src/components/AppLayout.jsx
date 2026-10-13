@@ -1,8 +1,9 @@
-import { AlertCircle, ArrowLeft, Calculator, FileText, Home, LogOut, Menu, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Calculator, FileText, Home, LogOut, Menu, RefreshCw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { getSession, clearSession } from '../services/auth'
 import { useSolicitudes } from '../hooks/useSolicitudes'
+import { usePwaUpdates } from './PwaUpdates'
 
 const navigation = [
   { to: '/inicio', label: 'Inicio', icon: Home },
@@ -17,6 +18,7 @@ export default function AppLayout() {
   const location = useLocation()
   const session = getSession()
   const { storageError, clearStorageError } = useSolicitudes()
+  const { checkForUpdates, checking } = usePwaUpdates()
   const initials = session?.email?.slice(0, 2).toUpperCase()
   const isSectionPage = /^\/solicitudes\/[^/]+\/(plan-pagos|flujo-caja|tamano-actividad|balance-general)$/.test(location.pathname)
 
@@ -60,6 +62,7 @@ export default function AppLayout() {
         <div className="brand"><span className="brand-mark"><Calculator /></span><div><strong>Calculadora</strong><em>Pyme</em></div></div>
         <nav aria-label="Navegación principal">
           {navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMenuOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={20} />{label}</NavLink>)}
+          <button type="button" className="nav-link nav-action" onClick={() => { setMenuOpen(false); void checkForUpdates({ manual: true }) }} disabled={checking}><RefreshCw size={20} />{checking ? 'Buscando actualizaciones…' : 'Buscar actualizaciones'}</button>
         </nav>
         <div className="sidebar-user">
           <div className="avatar">{initials}</div>
