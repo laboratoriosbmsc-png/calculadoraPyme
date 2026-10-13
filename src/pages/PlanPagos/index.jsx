@@ -103,7 +103,7 @@ export function PaymentTable({ rows }) {
 
   return <section className="surface table-section">
     <div className="section-heading"><div><h2>Plan de pago generado</h2></div></div>
-    <div className="table-scroll"><table><thead><tr><th>Número cuota</th><th>Saldo capital</th><th>Amortización a capital</th><th>Intereses</th><th>Seguros</th><th>Cuota total</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.numeroCuota}><td><strong>{row.numeroCuota}</strong></td><td>{formatMoney(row.saldoCapital)}</td><td>{formatMoney(row.amortizacionCapital)}</td><td>{formatMoney(row.intereses)}</td><td>{formatMoney(row.seguros)}</td><td><strong>{formatMoney(row.cuotaTotal)}</strong></td></tr>)}</tbody></table></div>
+    <div className="table-scroll"><table className="payment-table"><thead><tr><th>Número<br className="mobile-column-break" /> cuota</th><th>Saldo<br className="mobile-column-break" /> capital</th><th>Amortización<br className="mobile-column-break" /> a capital</th><th>Intereses</th><th>Seguros</th><th>Cuota<br className="mobile-column-break" /> total</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.numeroCuota}><td><strong>{row.numeroCuota}</strong></td><td>{formatMoney(row.saldoCapital)}</td><td>{formatMoney(row.amortizacionCapital)}</td><td>{formatMoney(row.intereses)}</td><td>{formatMoney(row.seguros)}</td><td><strong>{formatMoney(row.cuotaTotal)}</strong></td></tr>)}</tbody></table></div>
     <div className="table-pagination">
       <span>Cuotas {rows.length ? firstRow + 1 : 0}–{Math.min(firstRow + pageSize, rows.length)} de {rows.length}</span>
       <div>

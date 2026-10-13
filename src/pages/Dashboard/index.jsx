@@ -35,7 +35,7 @@ export default function DashboardPage() {
         <article className="metric-card gold"><span className="metric-icon"><BadgeCheck /></span><div><span>Solicitudes completas</span><strong>{completedCount}</strong><small>4 secciones finalizadas</small></div></article>
       </section>
 
-      <section className="dashboard-grid">
+      <section>
         <div className="surface recent-panel">
           <div className="section-heading"><div><h2>Últimas solicitudes</h2><p>Tus cinco evaluaciones más recientes</p></div><Link className="text-link" to="/solicitudes">Ver todas <ArrowRight size={16} /></Link></div>
           {latest.length ? <div className="recent-list">{latest.map((item) => (
@@ -47,11 +47,6 @@ export default function DashboardPage() {
             </Link>
           ))}</div> : <div className="empty-state"><span className="empty-icon"><FilePlus2 /></span><h3>Aún no tienes solicitudes</h3><p>Crea la primera evaluación y elige por qué sección comenzar.</p><button type="button" className="button primary small" onClick={() => setNewOpen(true)}>Crear solicitud</button></div>}
         </div>
-        <aside className="surface quick-panel">
-          <span className="eyebrow">Acceso rápido</span><h2>Comienza una evaluación</h2><p>Crea la referencia del cliente y completa las secciones en el orden que prefieras.</p>
-          <button type="button" className="quick-action" onClick={() => setNewOpen(true)}><span><Plus /></span><div><strong>Nueva solicitud</strong><small>Completa las 4 secciones</small></div><ArrowRight size={18} /></button>
-          <div className="quick-note"><span>Tip</span>La información se guarda únicamente cuando completas cada formulario.</div>
-        </aside>
       </section>
       <NuevaSolicitudModal open={newOpen} onClose={() => setNewOpen(false)} />
     </div>

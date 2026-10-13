@@ -1,4 +1,4 @@
-import { Banknote, BarChart3, ChevronLeft, ChevronRight, Download, Ellipsis, FilePlus2, Pencil, Plus, Scale, Search, Trash2, TrendingUp } from 'lucide-react'
+import { Banknote, BarChart3, ChevronLeft, ChevronRight, Ellipsis, Eye, FilePlus2, Pencil, Plus, Scale, Search, Share2, Trash2, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
@@ -18,6 +18,8 @@ export default function SolicitudesPage() {
   const [sectionsTarget, setSectionsTarget] = useState(null)
   const [menuOpenId, setMenuOpenId] = useState(null)
   const [menuPosition, setMenuPosition] = useState(null)
+  const [sharePdf, setSharePdf] = useState(null)
+  const [shareNotice, setShareNotice] = useState('')
   const [page, setPage] = useState(1)
   const { solicitudesPropias, deleteSolicitud, updateSolicitud } = useSolicitudes()
   const navigate = useNavigate()
@@ -29,6 +31,12 @@ export default function SolicitudesPage() {
   const visibleRequests = filtered.slice(firstRow, firstRow + pageSize)
 
   useEffect(() => setPage(1), [query])
+
+  useEffect(() => {
+    if (!shareNotice) return undefined
+    const timeout = window.setTimeout(() => setShareNotice(''), 4000)
+    return () => window.clearTimeout(timeout)
+  }, [shareNotice])
 
   useEffect(() => {
     const closeMenu = (event) => {
@@ -59,9 +67,16 @@ export default function SolicitudesPage() {
       setMenuOpenId(null)
       return
     }
+    setSharePdf(null)
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      import('../../services/informePdf').then(({ createInformePdf }) => {
+        const { blob, fileName } = createInformePdf(item)
+        setSharePdf({ itemId: item.id, file: new File([blob], fileName, { type: 'application/pdf' }) })
+      }).catch(() => setShareNotice('No se pudo preparar el PDF. Inténtalo de nuevo.'))
+    }
     const rect = event.currentTarget.getBoundingClientRect()
     const menuWidth = 190
-    const menuHeight = 144
+    const menuHeight = window.matchMedia('(max-width: 900px)').matches ? 186 : 144
     const gap = 6
     const openUp = window.innerHeight - rect.bottom < menuHeight + gap
     setMenuPosition({
@@ -69,6 +84,32 @@ export default function SolicitudesPage() {
       left: Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth)),
     })
     setMenuOpenId(item.id)
+  }
+
+  const shareReport = async (item) => {
+    const file = sharePdf?.itemId === item.id ? sharePdf.file : null
+    setMenuOpenId(null)
+    if (!file) {
+      setShareNotice('No se pudo preparar el PDF. Inténtalo de nuevo.')
+      return
+    }
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ files: [file], title: `Informe de ${item.nombreReferencia}` })
+      } else {
+        const url = URL.createObjectURL(file)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = file.name
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        setShareNotice('Tu navegador no permite compartir archivos; se descargó el PDF.')
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') setShareNotice('No se pudo compartir el PDF. Inténtalo de nuevo.')
+    }
   }
 
   const remove = () => {
@@ -99,6 +140,7 @@ export default function SolicitudesPage() {
   return (
     <div className="page-container">
       <header className="page-heading"><div><span className="eyebrow">Evaluaciones</span><h1>Solicitudes</h1><p>Gestiona los análisis registrados para tus clientes.</p></div><button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={19} />Nueva solicitud</button></header>
+      {shareNotice && <div className="share-report-notice" role="status">{shareNotice}</div>}
       <div className="toolbar surface"><div className="search-box"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre de referencia" aria-label="Buscar solicitudes" /></div><span className="result-count">{filtered.length} {filtered.length === 1 ? 'solicitud' : 'solicitudes'}</span></div>
       {filtered.length ? (
         <div className="surface requests-table-panel">
@@ -111,7 +153,8 @@ export default function SolicitudesPage() {
                 <td><div className="request-sections-cell"><RequestSectionLinks item={item} /><div className="card-menu-container request-actions-menu">
                     <button type="button" className="icon-button card-menu-trigger" onClick={(event) => toggleActionsMenu(item, event)} aria-label={`Opciones de ${item.nombreReferencia}`} aria-expanded={menuOpenId === item.id} aria-haspopup="menu"><Ellipsis size={20} /></button>
                     {menuOpenId === item.id && menuPosition && createPortal(<div className="card-menu-popover request-actions-popover" role="menu" style={menuPosition}>
-                      <button type="button" role="menuitem" onClick={() => { setMenuOpenId(null); navigate(`/solicitudes/${item.id}/informe`) }}><Download size={17} />Exportar informe</button>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpenId(null); navigate(`/solicitudes/${item.id}/informe`) }}><Eye size={17} />Ver informe</button>
+                      <button type="button" role="menuitem" className="share-report-option" disabled={sharePdf?.itemId !== item.id} onClick={() => shareReport(item)}><Share2 size={17} />{sharePdf?.itemId === item.id ? 'Compartir informe' : 'Preparando PDF…'}</button>
                       <button type="button" role="menuitem" onClick={() => openEdit(item)}><Pencil size={17} />Editar nombre</button>
                       <button type="button" role="menuitem" className="danger" onClick={() => requestDelete(item)}><Trash2 size={17} />Eliminar</button>
                     </div>, document.body)}

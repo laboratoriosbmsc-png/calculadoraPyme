@@ -130,7 +130,7 @@ Reglas:
 - Al crear una solicitud se elige inmediatamente una de las cuatro secciones; no existe un orden obligatorio.
 - El listado permite buscar por nombre, navegar por páginas de 10 registros y abrir directamente cada sección.
 - Al pulsar el nombre se abre un selector con las cuatro secciones.
-- El menú de tres puntos contiene: exportar informe, editar nombre y eliminar.
+- El menú de tres puntos contiene: ver informe, editar nombre y eliminar; en móvil también permite compartir el informe como PDF mediante las opciones nativas del dispositivo.
 - Eliminar exige confirmación y elimina definitivamente toda la solicitud.
 - La ruta histórica `/solicitudes/:id` redirige al listado.
 - Una solicitud es completa solo cuando existen las cuatro secciones guardadas.

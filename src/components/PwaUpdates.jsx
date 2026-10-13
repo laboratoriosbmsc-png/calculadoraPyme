@@ -15,6 +15,7 @@ export function PwaUpdatesProvider({ children }) {
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState('')
   const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false)
+  const [controllerUpdated, setControllerUpdated] = useState(false)
   const checkingRef = useRef(false)
   const applyingRef = useRef(false)
 
@@ -29,6 +30,10 @@ export function PwaUpdatesProvider({ children }) {
     },
     onRegisterError() {
       setNotice('No se pudo preparar la aplicación para usarla sin conexión.')
+    },
+    onNeedReload() {
+      if (isUpdateBlocked()) setControllerUpdated(true)
+      else window.location.reload()
     },
   })
 
@@ -47,8 +52,12 @@ export function PwaUpdatesProvider({ children }) {
   }, [offlineReady])
 
   useEffect(() => {
-    if (needRefresh) setUpdateNoticeDismissed(false)
-  }, [needRefresh])
+    if (needRefresh || controllerUpdated) setUpdateNoticeDismissed(false)
+  }, [needRefresh, controllerUpdated])
+
+  useEffect(() => {
+    if (controllerUpdated && !updateBlocked && !isUpdateBlocked()) window.location.reload()
+  }, [controllerUpdated, updateBlocked])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -111,7 +120,7 @@ export function PwaUpdatesProvider({ children }) {
     })
   }, [needRefresh, updateBlocked, updateServiceWorker])
 
-  const showUpdateNotice = needRefresh && updateBlocked && !updateNoticeDismissed
+  const showUpdateNotice = (needRefresh || controllerUpdated) && updateBlocked && !updateNoticeDismissed
 
   return (
     <PwaUpdatesContext.Provider value={{ checkForUpdates, checking }}>
