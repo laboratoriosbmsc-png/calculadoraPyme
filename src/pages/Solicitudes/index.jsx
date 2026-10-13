@@ -20,6 +20,7 @@ export default function SolicitudesPage() {
   const [menuOpenId, setMenuOpenId] = useState(null)
   const [menuPosition, setMenuPosition] = useState(null)
   const [sharePdf, setSharePdf] = useState(null)
+  const [sharingId, setSharingId] = useState(null)
   const [shareNotice, setShareNotice] = useState('')
   const [page, setPage] = useState(1)
   const { solicitudesPropias, deleteSolicitud, updateSolicitud } = useSolicitudes()
@@ -68,13 +69,6 @@ export default function SolicitudesPage() {
       setMenuOpenId(null)
       return
     }
-    setSharePdf(null)
-    if (window.matchMedia('(max-width: 900px)').matches) {
-      import('../../services/informePdf').then(async ({ createInformePdf }) => {
-        const { blob, fileName } = await createInformePdf(item)
-        setSharePdf({ itemId: item.id, file: new File([blob], fileName, { type: 'application/pdf' }) })
-      }).catch(() => setShareNotice('No se pudo preparar el PDF. Inténtalo de nuevo.'))
-    }
     const rect = event.currentTarget.getBoundingClientRect()
     const menuWidth = 190
     const menuHeight = window.matchMedia('(max-width: 900px)').matches ? 186 : 144
@@ -88,15 +82,33 @@ export default function SolicitudesPage() {
   }
 
   const shareReport = async (item) => {
-    const file = sharePdf?.itemId === item.id ? sharePdf.file : null
+    if (sharingId) return
     setMenuOpenId(null)
-    if (!file) {
-      setShareNotice('No se pudo preparar el PDF. Inténtalo de nuevo.')
-      return
-    }
+    setShareNotice('')
+    const cachedFile = sharePdf?.itemId === item.id && sharePdf.updatedAt === item.fechaActualizacion ? sharePdf.file : null
+    if (!cachedFile) setSharingId(item.id)
     try {
+      let file = cachedFile
+      if (!file) {
+        const { createInformePdf } = await import('../../services/informePdf')
+        const { blob, fileName } = await createInformePdf(item)
+        file = new File([blob], fileName, { type: 'application/pdf' })
+      }
+      setSharingId(null)
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ files: [file], title: `Informe de ${item.nombreReferencia}` })
+        try {
+          await navigator.share({ files: [file], title: `Informe de ${item.nombreReferencia}` })
+          setSharePdf(null)
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            setSharePdf(null)
+          } else if (error.name === 'NotAllowedError' && !cachedFile) {
+            setSharePdf({ itemId: item.id, updatedAt: item.fechaActualizacion, file })
+            setShareNotice('El PDF está listo. Abre el menú y pulsa Compartir informe otra vez.')
+          } else {
+            throw error
+          }
+        }
       } else {
         const url = URL.createObjectURL(file)
         const link = document.createElement('a')
@@ -106,10 +118,14 @@ export default function SolicitudesPage() {
         link.click()
         link.remove()
         window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        setSharePdf(null)
         setShareNotice('Tu navegador no permite compartir archivos; se descargó el PDF.')
       }
     } catch (error) {
+      setSharePdf(null)
       if (error.name !== 'AbortError') setShareNotice('No se pudo compartir el PDF. Inténtalo de nuevo.')
+    } finally {
+      setSharingId(null)
     }
   }
 
@@ -142,7 +158,7 @@ export default function SolicitudesPage() {
   return (
     <div className="page-container">
       <header className="page-heading"><div><h1>Solicitudes</h1><p>Gestiona los análisis registrados para tus clientes.</p></div><button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={19} />Nueva solicitud</button></header>
-      {shareNotice && <div className="share-report-notice" role="status">{shareNotice}</div>}
+      {(sharingId || shareNotice) && <div className="share-report-notice" role="status">{sharingId ? 'Preparando el PDF para compartir…' : shareNotice}</div>}
       <div className="toolbar surface"><div className="search-box"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre de referencia" aria-label="Buscar solicitudes" /></div><span className="result-count">{filtered.length} {filtered.length === 1 ? 'solicitud' : 'solicitudes'}</span></div>
       {filtered.length ? (
         <div className="surface requests-table-panel">
@@ -156,7 +172,7 @@ export default function SolicitudesPage() {
                     <button type="button" className="icon-button card-menu-trigger" onClick={(event) => toggleActionsMenu(item, event)} aria-label={`Opciones de ${item.nombreReferencia}`} aria-expanded={menuOpenId === item.id} aria-haspopup="menu"><Ellipsis size={20} /></button>
                     {menuOpenId === item.id && menuPosition && createPortal(<div className="card-menu-popover request-actions-popover" role="menu" style={menuPosition}>
                       <button type="button" role="menuitem" onClick={() => { setMenuOpenId(null); navigate(`/solicitudes/${item.id}/informe`) }}><Eye size={17} />Ver informe</button>
-                      <button type="button" role="menuitem" className="share-report-option" disabled={sharePdf?.itemId !== item.id} onClick={() => shareReport(item)}><Share2 size={17} />{sharePdf?.itemId === item.id ? 'Compartir informe' : 'Preparando PDF…'}</button>
+                      <button type="button" role="menuitem" className="share-report-option" disabled={Boolean(sharingId)} onClick={() => shareReport(item)}><Share2 size={17} />Compartir informe</button>
                       <button type="button" role="menuitem" onClick={() => openEdit(item)}><Pencil size={17} />Editar nombre</button>
                       <button type="button" role="menuitem" className="danger" onClick={() => requestDelete(item)}><Trash2 size={17} />Eliminar</button>
                     </div>, document.body)}

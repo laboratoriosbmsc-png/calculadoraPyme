@@ -1,4 +1,4 @@
  
 git add .
-git commit -m "Se agrega PWA"
+git commit -m "Quita icono del nombre del solicitante"
 git push origin main
