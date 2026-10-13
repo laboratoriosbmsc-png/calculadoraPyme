@@ -1,9 +1,11 @@
-import { ArrowLeft, CheckCircle2, Scale, Save } from 'lucide-react'
+import { ArrowLeft, Scale, Save } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import FieldErrorMark from '../../components/FieldErrorMark'
+import SaveToast from '../../components/SaveToast'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
-import { formatMoney, sumarCampos } from '../../services/calculos'
+import { calcularLimiteFinanciamientoBalance, formatMoney, sumarCampos } from '../../services/calculos'
 import { BALANCE_ACTIVOS_FIELDS, BALANCE_PASIVOS_FIELDS, GARANTIAS_BALANCE } from '../../types/constants'
 
 const defaults = Object.fromEntries([...BALANCE_ACTIVOS_FIELDS, ...BALANCE_PASIVOS_FIELDS].map(([name]) => [name, '']))
@@ -20,7 +22,8 @@ export default function BalanceGeneralPage() {
 
   const totalActivos = useMemo(() => sumarCampos(campos, BALANCE_ACTIVOS_FIELDS.map(([name]) => name)), [campos])
   const totalPasivos = useMemo(() => sumarCampos(campos, BALANCE_PASIVOS_FIELDS.map(([name]) => name)), [campos])
-  const limiteFinanciamiento = campos.tipoGarantia ? totalActivos + totalPasivos + (campos.tipoGarantia === GARANTIAS_BALANCE[1] ? 100 : 0) : null
+  const totalPatrimonio = totalActivos - totalPasivos
+  const limiteFinanciamiento = calcularLimiteFinanciamientoBalance(totalActivos, totalPasivos, campos.tipoGarantia)
   if (!solicitud) return <Missing />
 
   const change = (name, value) => {
@@ -46,7 +49,7 @@ export default function BalanceGeneralPage() {
     if (!validate()) return
     const finalActivos = sumarCampos(campos, BALANCE_ACTIVOS_FIELDS.map(([name]) => name))
     const finalPasivos = sumarCampos(campos, BALANCE_PASIVOS_FIELDS.map(([name]) => name))
-    const finalLimit = finalActivos + finalPasivos + (campos.tipoGarantia === GARANTIAS_BALANCE[1] ? 100 : 0)
+    const finalLimit = calcularLimiteFinanciamientoBalance(finalActivos, finalPasivos, campos.tipoGarantia)
     if (updateSolicitud(id, { balanceGeneral: { campos, totalActivos: finalActivos, totalPasivos: finalPasivos, limiteFinanciamiento: finalLimit } })) {
       setDirty(false)
       setSaved(true)
@@ -56,15 +59,22 @@ export default function BalanceGeneralPage() {
   return (
     <div className="page-container form-page">
       <Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link>
-      <header className="form-header"><div><span className="eyebrow">{solicitud.nombreReferencia}</span><h1>Balance General</h1><p>Registra activos, pasivos y el límite provisional de financiamiento.</p></div><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.balanceGeneral ? 'Sección completada' : 'Sección en blanco'}</span></header>
-      {saved && <div className="success-banner" role="status"><CheckCircle2 size={19} />La información se guardó correctamente.</div>}
+      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Balance General</h1><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.balanceGeneral ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
+      {saved && <SaveToast onDismiss={setSaved} />}
       <form onSubmit={submit} noValidate>
         <BalanceSection number="01" title="Activos" description="Registra los recursos y bienes de la empresa." fields={BALANCE_ACTIVOS_FIELDS} campos={campos} errors={errors} onChange={change} />
-        <div className="section-total"><span>Total activos</span><strong>Bs {formatMoney(totalActivos)}</strong></div>
         <BalanceSection number="02" title="Pasivos" description="Registra las obligaciones y deudas vigentes." fields={BALANCE_PASIVOS_FIELDS} campos={campos} errors={errors} onChange={change} />
-        <div className="section-total burgundy-total"><span>Total pasivos</span><strong>Bs {formatMoney(totalPasivos)}</strong></div>
 
-        <section className="form-section surface"><div className="form-section-heading"><span>03</span><div><h2>Resumen</h2><p>Selecciona la garantía para calcular el límite provisional.</p></div></div><fieldset className="guarantee-fieldset"><legend className="field-label">Tipo de Garantía para relación Deuda/Patrimonio</legend><div className="visible-choice-grid">{GARANTIAS_BALANCE.map((garantia) => <label key={garantia} className={`visible-choice ${campos.tipoGarantia === garantia ? 'selected' : ''}`}><input type="radio" name="tipoGarantia" value={garantia} checked={campos.tipoGarantia === garantia} onChange={(event) => change('tipoGarantia', event.target.value)} /><span className="radio-control" /><strong>{garantia}</strong></label>)}</div>{errors.tipoGarantia && <p className="field-error">{errors.tipoGarantia}</p>}</fieldset><div className="readonly-grid summary-readonly"><div className="readonly-field full-result"><span>Límite de Financiamiento</span><strong>{limiteFinanciamiento === null ? '—' : `Bs ${formatMoney(limiteFinanciamiento)}`}</strong></div></div></section>
+        <section className="form-section surface">
+          <div className="form-section-heading"><span>03</span><div><h2>Resumen</h2><p>Selecciona la garantía para calcular el límite provisional.</p></div></div>
+          <div className="readonly-grid balance-summary-totals">
+            <div className="readonly-field"><span>Total activos</span><strong>Bs {formatMoney(totalActivos)}</strong></div>
+            <div className="readonly-field balance-passivos-total"><span>Total pasivos</span><strong>Bs {formatMoney(totalPasivos)}</strong></div>
+            <div className="readonly-field"><span>Total patrimonio</span><strong>Bs {formatMoney(totalPatrimonio)}</strong></div>
+          </div>
+          <fieldset className="guarantee-fieldset"><legend className="field-label">Tipo de Garantía para relación Deuda/Patrimonio</legend><div className="visible-choice-grid balance-guarantee-options">{GARANTIAS_BALANCE.map((garantia) => <label key={garantia} className={`visible-choice ${campos.tipoGarantia === garantia ? 'selected' : ''}`}><input type="radio" name="tipoGarantia" value={garantia} checked={campos.tipoGarantia === garantia} onChange={(event) => change('tipoGarantia', event.target.value)} /><span className="radio-control" /><strong>{garantia}</strong></label>)}</div>{errors.tipoGarantia && <p className="field-error">{errors.tipoGarantia}</p>}</fieldset>
+          <div className="readonly-grid summary-readonly"><div className="readonly-field full-result"><span>Límite de Financiamiento</span><strong>{limiteFinanciamiento === null ? '—' : `Bs ${formatMoney(limiteFinanciamiento)}`}</strong></div></div>
+        </section>
         <div className="form-footer right"><button className="button primary large-button"><Save size={19} />Guardar</button></div>
       </form>
     </div>
@@ -72,7 +82,7 @@ export default function BalanceGeneralPage() {
 }
 
 function BalanceSection({ number, title, description, fields, campos, errors, onChange }) {
-  return <section className="form-section surface"><div className="form-section-heading"><span>{number}</span><div><h2>{title}</h2><p>{description}</p></div></div><div className="form-grid">{fields.map(([name, label]) => <div className="field-group" key={name}><label className="field-label" htmlFor={name}>{label}</label><div className={`number-input ${errors[name] ? 'invalid' : ''}`}><input id={name} type="number" min="0" step="0.01" inputMode="decimal" value={campos[name]} onChange={(event) => onChange(name, event.target.value)} /><span>Bs</span></div>{errors[name] && <p className="field-error">{errors[name]}</p>}</div>)}</div></section>
+  return <section className="form-section surface"><div className="form-section-heading"><span>{number}</span><div><h2>{title}</h2><p>{description}</p></div></div><div className="form-grid balance-form-grid">{fields.map(([name, label]) => <div className="field-group" key={name}><label className="field-label" htmlFor={name}>{label} <FieldErrorMark error={errors[name]} id={`${name}-error`} /></label><div className={`number-input ${errors[name] ? 'invalid' : ''}`}><input id={name} type="number" min="0" step="0.01" inputMode="decimal" value={campos[name]} onChange={(event) => onChange(name, event.target.value)} aria-invalid={Boolean(errors[name])} aria-describedby={errors[name] ? `${name}-error` : undefined} /><span>Bs</span></div></div>)}</div></section>
 }
 
 function Missing() { return <div className="surface empty-state large-empty"><Scale /><h1>Solicitud no encontrada</h1><Link className="button primary" to="/solicitudes">Volver al listado</Link></div> }

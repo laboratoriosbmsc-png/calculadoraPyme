@@ -15,17 +15,35 @@ export const PLAN_FIELDS = [
   ['seguroAnual', 'Seguro anual (%)'],
 ]
 
-export const FLUJO_FIELDS = [
+export const FLUJO_ACTIVIDAD_1_FIELDS = [
   ['ingresosActividad1', 'Ingresos mensuales de actividad 1'],
   ['costosActividad1', 'Costos mensuales de actividad 1'],
+  ['gastosOperativosActividad1', 'Gastos operativos mensuales de actividad 1'],
   ['margenActividad1', 'Margen operativo actividad 1'],
+]
+
+export const FLUJO_ACTIVIDAD_2_FIELDS = [
   ['ingresosActividad2', 'Ingresos mensuales de actividad 2'],
   ['costosActividad2', 'Costos mensuales de actividad 2'],
+  ['gastosOperativosActividad2', 'Gastos operativos mensuales de actividad 2'],
   ['margenActividad2', 'Margen operativo actividad 2'],
+]
+
+export const FLUJO_RESUMEN_FIELDS = [
   ['otrosIngresos', 'Otros ingresos'],
-  ['gastosFamiliares', 'Gastos familiares mensuales (Bs)'],
+  ['gastosFamiliares', 'Gastos familiares mensuales'],
+  ['cuotaPropuesta', 'Cuota mensual propuesta'],
+  ['cuotaSistemaFinanciero', 'Cuota en sistema financiero'],
+]
+
+export const FLUJO_FIELDS = [
+  ...FLUJO_ACTIVIDAD_1_FIELDS,
+  ...FLUJO_ACTIVIDAD_2_FIELDS,
   ['margenOperativoTotal', 'Margen operativo total'],
-  ['cuotaPropuesta', 'Cuota mensual propuesta (Bs)'],
+  ['otrosIngresos', 'Otros ingresos'],
+  ['gastosFamiliares', 'Gastos familiares mensuales'],
+  ['margenTotalOperativo', 'Margen total operativo'],
+  ['cuotaPropuesta', 'Cuota mensual propuesta'],
   ['cuotaSistemaFinanciero', 'Cuota en sistema financiero'],
 ]
 

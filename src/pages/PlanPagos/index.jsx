@@ -1,7 +1,8 @@
 import { ArrowLeft, Calculator, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Modal from '../../components/Modal'
+import FieldErrorMark from '../../components/FieldErrorMark'
+import SaveToast from '../../components/SaveToast'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
 import { formatMoney, generarTablaDemo } from '../../services/calculos'
@@ -19,12 +20,12 @@ export default function PlanPagosPage() {
   const [campos, setCampos] = useState(() => ({ ...defaults, ...(solicitud?.planPagos?.campos || {}) }))
   const [errors, setErrors] = useState({})
   const [dirty, setDirty] = useState(false)
-  const [resultOpen, setResultOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
   const table = solicitud?.planPagos?.tabla || []
   useUnsavedWarning(dirty)
   if (!solicitud) return <Missing />
 
-  const change = (name, value) => { setCampos((current) => ({ ...current, [name]: value })); setDirty(true); setErrors((current) => ({ ...current, [name]: '' })) }
+  const change = (name, value) => { setCampos((current) => ({ ...current, [name]: value })); setDirty(true); setSaved(false); setErrors((current) => ({ ...current, [name]: '' })) }
   const validate = () => {
     const next = {}
     PLAN_FIELDS.forEach(([name, label]) => {
@@ -57,17 +58,18 @@ export default function PlanPagosPage() {
 
     if (updateSolicitud(id, { planPagos: { campos,  tabla } })) {
       setDirty(false)
-      setResultOpen(true)
+      setSaved(true)
     }
   }
 
   return (
     <div className="page-container form-page">
       <Link className="back-link" to="/solicitudes"><ArrowLeft size={17} />Volver a solicitudes</Link>
-      <header className="form-header"><div><span className="eyebrow">{solicitud.nombreReferencia}</span><h1>Plan de Pagos</h1><p>Registra las condiciones propuestas para el financiamiento.</p></div><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.planPagos ? 'Sección completada' : 'Sección en blanco'}</span></header>
+      <header className="form-header"><span className="eyebrow">{solicitud.nombreReferencia}</span><div className="form-title-row"><h1>Plan de Pagos</h1><span className="draft-label">{dirty ? 'Cambios sin guardar' : solicitud.planPagos ? 'Sección completada' : 'Sección en blanco'}</span></div></header>
+      {saved && <SaveToast onDismiss={setSaved} />}
       <form onSubmit={submit} noValidate>
         <section className="form-section surface"><div className="form-section-heading"><span>01</span><div><h2>Condiciones del financiamiento</h2><p>Todos los campos son obligatorios.</p></div></div>
-          <div className="form-grid">
+          <div className="form-grid plan-form-grid">
             {PLAN_FIELDS.map(([name, label]) => <NumberField key={name} name={name} label={label} value={campos[name]} onChange={change} error={errors[name]} integer={integerFields.includes(name)} suffix={name === 'montoFinanciar' ? 'Bs' : name === 'plazoAnios' ? 'años' : '%'} />)}
           </div>
         </section>
@@ -81,15 +83,12 @@ export default function PlanPagosPage() {
         </div>
       </form>
       {solicitud.planPagos && <PaymentTable rows={table} />}
-      <Modal open={resultOpen} onClose={() => setResultOpen(false)} title="Plan generado correctamente" description="La sección fue guardada y ya puedes consultar la tabla demostrativa.">
-        <div className="modal-actions"><button type="button" className="button primary" onClick={() => setResultOpen(false)}>Ver plan generado</button></div>
-      </Modal>
     </div>
   )
 }
 
 function NumberField({ name, label, value, onChange, error, integer, suffix }) {
-  return <div className="field-group"><label className="field-label" htmlFor={name}>{label}</label><div className={`number-input ${error ? 'invalid' : ''}`}><input id={name} type="number" min="0" step={integer ? '1' : '0.01'} value={value} onChange={(event) => onChange(name, event.target.value)} inputMode={integer ? 'numeric' : 'decimal'} /><span>{suffix}</span></div>{error && <p className="field-error">{error}</p>}</div>
+  return <div className="field-group"><label className="field-label" htmlFor={name}>{label} <FieldErrorMark error={error} id={`${name}-error`} /></label><div className={`number-input ${error ? 'invalid' : ''}`}><input id={name} type="number" min="0" step={integer ? '1' : '0.01'} value={value} onChange={(event) => onChange(name, event.target.value)} inputMode={integer ? 'numeric' : 'decimal'} aria-invalid={Boolean(error)} aria-describedby={error ? `${name}-error` : undefined} /><span>{suffix}</span></div></div>
 }
 
 export function PaymentTable({ rows }) {

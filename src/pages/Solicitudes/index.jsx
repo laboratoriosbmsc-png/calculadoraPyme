@@ -1,11 +1,12 @@
-import { Banknote, BarChart3, Download, ExternalLink, FilePlus2, MoreVertical, Pencil, Plus, Scale, Search, Trash2, TrendingUp } from 'lucide-react'
+import { Banknote, BarChart3, ChevronLeft, ChevronRight, Download, Ellipsis, FilePlus2, Pencil, Plus, Scale, Search, Trash2, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import Modal from '../../components/Modal'
 import NuevaSolicitudModal from '../../components/NuevaSolicitudModal'
 import StatusBadge from '../../components/StatusBadge'
 import { useSolicitudes } from '../../hooks/useSolicitudes'
-import { formatDate } from '../../services/calculos'
+import { formatDate, getResultadoCargaFinanciera } from '../../services/calculos'
 
 export default function SolicitudesPage() {
   const [newOpen, setNewOpen] = useState(false)
@@ -16,13 +17,22 @@ export default function SolicitudesPage() {
   const [editError, setEditError] = useState('')
   const [sectionsTarget, setSectionsTarget] = useState(null)
   const [menuOpenId, setMenuOpenId] = useState(null)
+  const [menuPosition, setMenuPosition] = useState(null)
+  const [page, setPage] = useState(1)
   const { solicitudesPropias, deleteSolicitud, updateSolicitud } = useSolicitudes()
   const navigate = useNavigate()
   const filtered = useMemo(() => solicitudesPropias.filter((item) => item.nombreReferencia.toLowerCase().includes(query.toLowerCase())).sort((a, b) => new Date(b.fechaActualizacion) - new Date(a.fechaActualizacion)), [solicitudesPropias, query])
+  const pageSize = 10
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const firstRow = (currentPage - 1) * pageSize
+  const visibleRequests = filtered.slice(firstRow, firstRow + pageSize)
+
+  useEffect(() => setPage(1), [query])
 
   useEffect(() => {
     const closeMenu = (event) => {
-      if (!event.target.closest('.card-menu-container')) setMenuOpenId(null)
+      if (!event.target.closest('.request-actions-menu, .request-actions-popover')) setMenuOpenId(null)
     }
     const closeOnEscape = (event) => event.key === 'Escape' && setMenuOpenId(null)
     document.addEventListener('click', closeMenu)
@@ -32,6 +42,34 @@ export default function SolicitudesPage() {
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [])
+
+  useEffect(() => {
+    if (!menuOpenId) return undefined
+    const closeFloatingMenu = () => setMenuOpenId(null)
+    window.addEventListener('resize', closeFloatingMenu)
+    window.addEventListener('scroll', closeFloatingMenu, true)
+    return () => {
+      window.removeEventListener('resize', closeFloatingMenu)
+      window.removeEventListener('scroll', closeFloatingMenu, true)
+    }
+  }, [menuOpenId])
+
+  const toggleActionsMenu = (item, event) => {
+    if (menuOpenId === item.id) {
+      setMenuOpenId(null)
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const menuWidth = 190
+    const menuHeight = 144
+    const gap = 6
+    const openUp = window.innerHeight - rect.bottom < menuHeight + gap
+    setMenuPosition({
+      top: openUp ? Math.max(8, rect.top - menuHeight - gap) : rect.bottom + gap,
+      left: Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth)),
+    })
+    setMenuOpenId(item.id)
+  }
 
   const remove = () => {
     if (deleteSolicitud(deleteTarget.id)) setDeleteTarget(null)
@@ -63,29 +101,33 @@ export default function SolicitudesPage() {
       <header className="page-heading"><div><span className="eyebrow">Evaluaciones</span><h1>Solicitudes</h1><p>Gestiona los análisis registrados para tus clientes.</p></div><button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={19} />Nueva solicitud</button></header>
       <div className="toolbar surface"><div className="search-box"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre de referencia" aria-label="Buscar solicitudes" /></div><span className="result-count">{filtered.length} {filtered.length === 1 ? 'solicitud' : 'solicitudes'}</span></div>
       {filtered.length ? (
-        <div className="requests-grid">{filtered.map((item) => {
-          const flujoStatus = item.flujoCaja?.cargaFinanciera === 'RECHAZADO' ? 'Rechazo' : item.flujoCaja ? 'Completada' : 'En blanco'
-          return (
-            <article className="request-card" key={item.id}>
-              <div className="request-card-head">
-                <span className="reference-avatar large-avatar">{item.nombreReferencia.slice(0, 2).toUpperCase()}</span>
-                <div><h2>{item.nombreReferencia}</h2><p>Actualizada {formatDate(item.fechaActualizacion)}</p></div>
-                <div className="card-menu-container">
-                  <button type="button" className="icon-button card-menu-trigger" onClick={() => setMenuOpenId((current) => current === item.id ? null : item.id)} aria-label={`Opciones de ${item.nombreReferencia}`} aria-expanded={menuOpenId === item.id} aria-haspopup="menu"><MoreVertical size={20} /></button>
-                  {menuOpenId === item.id && <div className="card-menu-popover" role="menu"><button type="button" role="menuitem" onClick={() => openEdit(item)}><Pencil size={17} />Editar nombre</button><button type="button" role="menuitem" className="danger" onClick={() => requestDelete(item)}><Trash2 size={17} />Eliminar</button></div>}
-                </div>
-              </div>
-              <div className="request-dates"><span><small>Creación</small><strong>{formatDate(item.fechaCreacion, false)}</strong></span><span><small>Última edición</small><strong>{formatDate(item.fechaActualizacion, false)}</strong></span></div>
-              <div className="section-status-list">
-                <Link to={`/solicitudes/${item.id}/plan-pagos`} aria-label={`Ir a Plan de Pagos de ${item.nombreReferencia}`}><span>Plan de Pagos</span><StatusBadge status={item.planPagos ? 'Completada' : 'En blanco'} /></Link>
-                <Link to={`/solicitudes/${item.id}/flujo-caja`} aria-label={`Ir a Flujo de Caja de ${item.nombreReferencia}`}><span>Flujo de Caja</span><StatusBadge status={flujoStatus} /></Link>
-                <Link to={`/solicitudes/${item.id}/tamano-actividad`} aria-label={`Ir a Tamaño Actividad de ${item.nombreReferencia}`}><span>Tamaño Actividad</span><StatusBadge status={item.tamanoActividad ? 'Completada' : 'En blanco'} /></Link>
-                <Link to={`/solicitudes/${item.id}/balance-general`} aria-label={`Ir a Balance General de ${item.nombreReferencia}`}><span>Balance General</span><StatusBadge status={item.balanceGeneral ? 'Completada' : 'En blanco'} /></Link>
-              </div>
-              <div className="request-actions"><button type="button" className="button primary small grow" onClick={() => setSectionsTarget(item)}><ExternalLink size={17} />Abrir</button><button type="button" className="icon-button bordered" onClick={() => navigate(`/solicitudes/${item.id}/informe`)} aria-label={`Exportar ${item.nombreReferencia}`}><Download size={18} /></button></div>
-            </article>
-          )
-        })}</div>
+        <div className="surface requests-table-panel">
+          <div className="requests-table-scroll">
+            <table className="requests-table">
+              <colgroup><col className="request-client-column" /><col /></colgroup>
+              <thead><tr><th>Solicitud</th><th>Secciones</th></tr></thead>
+              <tbody>{visibleRequests.map((item) => <tr key={item.id}>
+                <td><div className="request-table-identity"><span className="reference-avatar large-avatar">{item.nombreReferencia.slice(0, 2).toUpperCase()}</span><div><button type="button" className="request-name-button" onClick={() => setSectionsTarget(item)}>{item.nombreReferencia}</button><small><Pencil size={10} aria-hidden="true" />{formatDate(item.fechaActualizacion)}</small></div></div></td>
+                <td><div className="request-sections-cell"><RequestSectionLinks item={item} /><div className="card-menu-container request-actions-menu">
+                    <button type="button" className="icon-button card-menu-trigger" onClick={(event) => toggleActionsMenu(item, event)} aria-label={`Opciones de ${item.nombreReferencia}`} aria-expanded={menuOpenId === item.id} aria-haspopup="menu"><Ellipsis size={20} /></button>
+                    {menuOpenId === item.id && menuPosition && createPortal(<div className="card-menu-popover request-actions-popover" role="menu" style={menuPosition}>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpenId(null); navigate(`/solicitudes/${item.id}/informe`) }}><Download size={17} />Exportar informe</button>
+                      <button type="button" role="menuitem" onClick={() => openEdit(item)}><Pencil size={17} />Editar nombre</button>
+                      <button type="button" role="menuitem" className="danger" onClick={() => requestDelete(item)}><Trash2 size={17} />Eliminar</button>
+                    </div>, document.body)}
+                  </div></div></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <div className="table-pagination requests-pagination">
+            <span>Solicitudes {firstRow + 1}–{Math.min(firstRow + pageSize, filtered.length)} de {filtered.length}</span>
+            <div>
+              <button type="button" className="pagination-button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} aria-label="Página anterior"><ChevronLeft size={17} /></button>
+              <strong>Página {currentPage} de {totalPages}</strong>
+              <button type="button" className="pagination-button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} aria-label="Página siguiente"><ChevronRight size={17} /></button>
+            </div>
+          </div>
+        </div>
       ) : <div className="surface empty-state large-empty"><span className="empty-icon"><FilePlus2 /></span><h2>{query ? 'No encontramos coincidencias' : 'Aún no tienes solicitudes'}</h2><p>{query ? 'Prueba con otro nombre de referencia.' : 'Crea una solicitud para comenzar una nueva evaluación.'}</p>{!query && <button type="button" className="button primary" onClick={() => setNewOpen(true)}><Plus size={18} />Nueva solicitud</button>}</div>}
 
       <NuevaSolicitudModal open={newOpen} onClose={() => setNewOpen(false)} />
@@ -103,9 +145,24 @@ export default function SolicitudesPage() {
   )
 }
 
+function RequestSectionLinks({ item }) {
+  const flujoStatus = getResultadoCargaFinanciera(item.flujoCaja) === 'RECHAZADO' ? 'Rechazo' : item.flujoCaja ? 'Completada' : 'En blanco'
+  const sections = [
+    { title: 'Plan de Pagos', description: 'Simula las condiciones del financiamiento.', icon: Banknote, path: 'plan-pagos', status: item.planPagos ? 'Completada' : 'En blanco' },
+    { title: 'Flujo de Caja', description: 'Evalúa el flujo neto y la carga financiera.', icon: TrendingUp, path: 'flujo-caja', status: flujoStatus },
+    { title: 'Tamaño Actividad', description: 'Clasifica la actividad según su índice.', icon: BarChart3, path: 'tamano-actividad', status: item.tamanoActividad ? 'Completada' : 'En blanco' },
+    { title: 'Balance General', description: 'Registra activos, pasivos y límite de financiamiento.', icon: Scale, path: 'balance-general', status: item.balanceGeneral ? 'Completada' : 'En blanco' },
+  ]
+  return <div className="request-section-icons">{sections.map(({ title, description, icon: Icon, path, status }) => {
+    const statusClass = status.toLowerCase().replace(' ', '-')
+    const tooltip = `${title}: ${description} Estado: ${status}.`
+    return <Link key={path} to={`/solicitudes/${item.id}/${path}`} className={`request-section-icon ${statusClass}`} aria-label={`Ir a ${title} de ${item.nombreReferencia}. ${tooltip}`} title={tooltip}><Icon size={18} /><span aria-hidden="true" /></Link>
+  })}</div>
+}
+
 function SectionsModal({ solicitud, onClose, onNavigate }) {
   if (!solicitud) return null
-  const flujoStatus = solicitud.flujoCaja?.cargaFinanciera === 'RECHAZADO' ? 'Rechazo' : solicitud.flujoCaja ? 'Completada' : 'En blanco'
+  const flujoStatus = getResultadoCargaFinanciera(solicitud.flujoCaja) === 'RECHAZADO' ? 'Rechazo' : solicitud.flujoCaja ? 'Completada' : 'En blanco'
   const sections = [
     { title: 'Plan de Pagos', icon: Banknote, color: 'green', status: solicitud.planPagos ? 'Completada' : 'En blanco', path: `/solicitudes/${solicitud.id}/plan-pagos` },
     { title: 'Flujo de Caja', icon: TrendingUp, color: 'burgundy', status: flujoStatus, path: `/solicitudes/${solicitud.id}/flujo-caja` },

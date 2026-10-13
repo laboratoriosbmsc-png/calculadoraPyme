@@ -2,7 +2,11 @@ import { useEffect } from 'react'
 
 export function useUnsavedWarning(isDirty) {
   useEffect(() => {
-    if (!isDirty) return undefined
+    if (!isDirty) {
+      delete document.documentElement.dataset.unsavedChanges
+      return undefined
+    }
+    document.documentElement.dataset.unsavedChanges = 'true'
     const beforeUnload = (event) => {
       event.preventDefault()
       event.returnValue = ''
@@ -18,6 +22,7 @@ export function useUnsavedWarning(isDirty) {
     window.addEventListener('beforeunload', beforeUnload)
     document.addEventListener('click', click, true)
     return () => {
+      delete document.documentElement.dataset.unsavedChanges
       window.removeEventListener('beforeunload', beforeUnload)
       document.removeEventListener('click', click, true)
     }
