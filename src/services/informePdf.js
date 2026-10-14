@@ -13,6 +13,9 @@ export async function createInformePdf(solicitud) {
   const container = document.createElement('div')
   container.className = 'pdf-render-root'
   container.innerHTML = renderToStaticMarkup(createElement(ReportSheet, { solicitud }))
+  // jsPDF's HTML renderer leaks SVG clipping paths into following content,
+  // hiding most of the first page. The icon meanings are already in text.
+  container.querySelectorAll('svg').forEach((icon) => icon.remove())
   document.body.appendChild(container)
 
   try {

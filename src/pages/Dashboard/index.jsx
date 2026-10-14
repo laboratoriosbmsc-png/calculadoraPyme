@@ -1,14 +1,19 @@
 import { ArrowRight, BadgeCheck, CalendarDays, CalendarRange, FilePlus2, Plus } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import NuevaSolicitudModal from '../../components/NuevaSolicitudModal'
+import SectionsModal from '../../components/SectionsModal'
+import { SolicitudActionDialogs, useSolicitudActions } from '../../components/SolicitudActions'
 import { useSolicitudes } from '../../hooks/useSolicitudes'
 import { formatDate } from '../../services/calculos'
 import { getSession } from '../../services/auth'
 
 export default function DashboardPage() {
   const [newOpen, setNewOpen] = useState(false)
+  const [sectionsTarget, setSectionsTarget] = useState(null)
   const { solicitudesPropias } = useSolicitudes()
+  const actions = useSolicitudActions()
+  const navigate = useNavigate()
   const latest = [...solicitudesPropias].sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion)).slice(0, 5)
   const now = new Date()
   const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -39,16 +44,18 @@ export default function DashboardPage() {
         <div className="surface recent-panel">
           <div className="section-heading"><div><h2>Últimas solicitudes</h2><p>Tus cinco evaluaciones más recientes</p></div><Link className="text-link" to="/solicitudes">Ver todas <ArrowRight size={16} /></Link></div>
           {latest.length ? <div className="recent-list">{latest.map((item) => (
-            <Link className="recent-row" key={item.id} to="/solicitudes">
+            <button type="button" className="recent-row" key={item.id} onClick={() => setSectionsTarget(item)}>
               <span className="reference-avatar">{item.nombreReferencia.slice(0, 2).toUpperCase()}</span>
               <span className="recent-main"><strong>{item.nombreReferencia}</strong><small>Creada {formatDate(item.fechaCreacion)}</small></span>
               <span className={`progress-badge ${sectionProgress(item) === 4 ? 'complete' : ''}`}>{sectionProgress(item)}/4 secciones</span>
               <ArrowRight className="row-arrow" size={18} />
-            </Link>
+            </button>
           ))}</div> : <div className="empty-state"><span className="empty-icon"><FilePlus2 /></span><h3>Aún no tienes solicitudes</h3><p>Crea la primera evaluación y elige por qué sección comenzar.</p><button type="button" className="button primary small" onClick={() => setNewOpen(true)}>Crear solicitud</button></div>}
         </div>
       </section>
       <NuevaSolicitudModal open={newOpen} onClose={() => setNewOpen(false)} />
+      <SectionsModal solicitud={sectionsTarget} onClose={() => setSectionsTarget(null)} onNavigate={(path) => { setSectionsTarget(null); navigate(path) }} actions={{ onView: () => { setSectionsTarget(null); navigate(`/solicitudes/${sectionsTarget.id}/informe`) }, onShare: () => { const item = sectionsTarget; setSectionsTarget(null); actions.shareReport(item) }, onEdit: () => { const item = sectionsTarget; setSectionsTarget(null); actions.openEdit(item) }, onDelete: () => { const item = sectionsTarget; setSectionsTarget(null); actions.setDeleteTarget(item) }, sharingId: actions.sharingId }} />
+      <SolicitudActionDialogs actions={actions} />
     </div>
   )
 }

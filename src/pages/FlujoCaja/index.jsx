@@ -1,10 +1,14 @@
 import { ArrowLeft, CheckCircle2, Save, XCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import CalculationHelp from '../../components/CalculationHelp'
 import FieldErrorMark from '../../components/FieldErrorMark'
+import { SectionSelectorButton, SectionSelectorDialog } from '../../components/SectionSelector'
 import SaveToast from '../../components/SaveToast'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
+import { focusFirstInvalid } from '../../services/focusFirstInvalid'
+import { formatMoney } from '../../services/calculos'
 import { FLUJO_ACTIVIDAD_1_FIELDS, FLUJO_ACTIVIDAD_2_FIELDS, FLUJO_FIELDS, FLUJO_RESUMEN_FIELDS, GARANTIAS } from '../../types/constants'
 
 const defaults = {
@@ -32,6 +36,7 @@ export default function FlujoCajaPage() {
   const [errors, setErrors] = useState({})
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [sectionsOpen, setSectionsOpen] = useState(false)
   useUnsavedWarning(dirty)
   const actividad2Activa = campos.anadirActividad2 === 'SI'
   const margenActividad1 = useMemo(() => calcularMargen(campos, actividad1Editables), [campos])
@@ -56,6 +61,7 @@ export default function FlujoCajaPage() {
   const cargaFinanciera = complete && margenTotalOperativo > 0
     ? ((Number(campos.cuotaPropuesta) + Number(campos.cuotaSistemaFinanciero)) / margenTotalOperativo) * 100
     : null
+  const cuotasTotales = Number(campos.cuotaPropuesta) + Number(campos.cuotaSistemaFinanciero)
   const limiteGarantia = campos.tipoGarantia ? Number(campos.tipoGarantia.match(/<=\s*(\d+(?:[.,]\d+)?)%/)?.[1]?.replace(',', '.')) : null
   const resultadoCarga = complete
     ? margenTotalOperativo > 0 && cargaFinanciera <= limiteGarantia ? 'APROBADO' : 'RECHAZADO'
@@ -66,7 +72,7 @@ export default function FlujoCajaPage() {
     setCampos((current) => ({ ...current, [name]: value, ...(name === 'anadirActividad2' && value === 'NO' ? { ingresosActividad2: '', costosActividad2: '', gastosOperativosActividad2: '', margenActividad2: '' } : {}) }))
     setDirty(true); setSaved(false); setErrors((current) => ({ ...current, [name]: '' }))
   }
-  const validate = () => {
+  const validate = (form) => {
     const next = {}
     if (!campos.tipoGarantia) next.tipoGarantia = 'Selecciona un tipo de garantía.'
     if (!campos.anadirActividad2) next.anadirActividad2 = 'Selecciona Sí o No.'
@@ -77,11 +83,12 @@ export default function FlujoCajaPage() {
       else if (!decimalFields.includes(name) && !Number.isInteger(Number(campos[name]))) next[name] = 'Ingresa un número sin decimales.'
     })
     setErrors(next)
+    focusFirstInvalid(form, next)
     return Object.keys(next).length === 0
   }
   const submit = (event) => {
     event.preventDefault()
-    if (!validate()) return
+    if (!validate(event.currentTarget)) return
     if (updateSolicitud(id, {
       flujoCaja: {
         campos: camposCalculados,
@@ -115,9 +122,18 @@ export default function FlujoCajaPage() {
         <section className="form-section surface"><div className="form-section-heading"><span>03</span><div><h2>Segunda actividad</h2><p>Agrega otra fuente de actividad cuando corresponda.</p></div></div><fieldset className="yes-no-fieldset"><legend>¿Desea añadir una 2da actividad? <FieldErrorMark error={errors.anadirActividad2} /></legend><div><label className={campos.anadirActividad2 === 'SI' ? 'selected' : ''}><input type="radio" name="anadirActividad2" value="SI" checked={campos.anadirActividad2 === 'SI'} onChange={(event) => change('anadirActividad2', event.target.value)} />Sí</label><label className={campos.anadirActividad2 === 'NO' ? 'selected' : ''}><input type="radio" name="anadirActividad2" value="NO" checked={campos.anadirActividad2 === 'NO'} onChange={(event) => change('anadirActividad2', event.target.value)} />No</label></div></fieldset>{actividad2Activa && <div className="form-grid flow-form-grid activity-two">{actividad2Editables.map(([name, label]) => <FlowField key={name} name={name} label={label} value={campos[name]} onChange={change} error={errors[name]} />)}<FlowField name="margenActividad2" label="Margen operativo actividad 2" value={margenActividad2 ?? ''} readOnly /></div>}</section>
         <section className="form-section surface"><div className="form-section-heading"><span>04</span><div><h2>Margen operativo Total</h2><p>Suma de los márgenes operativos de las actividades registradas.</p></div></div><div className="form-grid flow-form-grid"><FlowField name="margenOperativoTotal" label="Margen operativo total" value={margenOperativoTotal ?? ''} readOnly /></div></section>
         <section className="form-section surface"><div className="form-section-heading"><span>05</span><div><h2>Resumen financiero mensual</h2><p>Completa los datos restantes de la evaluación.</p></div></div><div className="form-grid flow-form-grid flow-summary-grid"><FlowField name="otrosIngresos" label="Otros ingresos" value={campos.otrosIngresos} onChange={change} error={errors.otrosIngresos} /><FlowField name="gastosFamiliares" label="Gastos familiares mensuales" value={campos.gastosFamiliares} onChange={change} error={errors.gastosFamiliares} /><FlowField name="margenTotalOperativo" label="Margen total operativo" value={margenTotalOperativo ?? ''} readOnly className="flow-full-row" /><FlowField name="cuotaPropuesta" label="Cuota mensual propuesta" value={campos.cuotaPropuesta} onChange={change} error={errors.cuotaPropuesta} /><FlowField name="cuotaSistemaFinanciero" label="Cuota en sistema financiero" value={campos.cuotaSistemaFinanciero} onChange={change} error={errors.cuotaSistemaFinanciero} decimal /></div></section>
-        <section className="form-section surface flow-result-section"><div className="form-section-heading"><span>06</span><div><h2>Resultado de la evaluación</h2><p>Comparación de la carga financiera con el límite de la garantía seleccionada.</p></div></div><div className="form-grid flow-form-grid"><FlowField name="totalFlujoNeto" label="Total flujo Neto de fondos" value={totalFlujoNeto ?? ''} readOnly /><FlowField name="cargaFinanciera" label="Carga financiera" value={cargaFinanciera === null ? '' : Number(cargaFinanciera.toFixed(2))} suffix="%" readOnly /></div><div className={`flow-result-status ${resultadoCarga ? resultadoCarga.toLowerCase() : 'pending'}`}>{resultadoCarga === 'APROBADO' ? <CheckCircle2 /> : resultadoCarga === 'RECHAZADO' ? <XCircle /> : <span className="status-placeholder" />}<span><small>{limiteGarantia ? `Límite de garantía: ${limiteGarantia}%` : 'Selecciona una garantía y completa los datos'}</small><strong>{resultadoCarga || 'PENDIENTE'}</strong></span></div></section>
-        <div className="form-footer right"><button className="button primary large-button"><Save size={19} />Guardar</button></div>
+        <section className="form-section surface flow-result-section"><div className="form-section-heading"><span>06</span><div><h2>Resultado provisional</h2><p>Comparación de la carga financiera con el límite de la garantía seleccionada.</p></div></div><div className="form-grid flow-form-grid"><FlowField name="totalFlujoNeto" label="Total flujo Neto de fondos" value={totalFlujoNeto ?? ''} readOnly /><FlowField name="cargaFinanciera" label="Carga financiera" value={cargaFinanciera === null ? '' : Number(cargaFinanciera.toFixed(2))} suffix="%" readOnly /></div><div className={`flow-result-status ${resultadoCarga ? resultadoCarga.toLowerCase() : 'pending'}`}>{resultadoCarga === 'APROBADO' ? <CheckCircle2 /> : resultadoCarga === 'RECHAZADO' ? <XCircle /> : <span className="status-placeholder" />}<span><small>{limiteGarantia ? `Límite de garantía: ${limiteGarantia}%` : 'Selecciona una garantía y completa los datos'}</small><strong>{resultadoCarga || 'PENDIENTE'}</strong></span></div><p className="result-disclaimer">Estimación basada en los datos ingresados; no constituye una aprobación crediticia.</p><CalculationHelp>{!complete
+          ? <p>Completa los campos y selecciona una garantía para ver el cálculo con tus importes.</p>
+          : <>
+          <p><b>Margen total operativo =</b> margen de actividades + otros ingresos − gastos familiares: Bs {formatMoney(margenOperativoTotal)} + Bs {formatMoney(campos.otrosIngresos)} − Bs {formatMoney(campos.gastosFamiliares)} = <strong>Bs {formatMoney(margenTotalOperativo)}</strong>.</p>
+          <p><b>Cuotas =</b> cuota propuesta + cuota en sistema: Bs {formatMoney(campos.cuotaPropuesta)} + Bs {formatMoney(campos.cuotaSistemaFinanciero)} = <strong>Bs {formatMoney(cuotasTotales)}</strong>.</p>
+          <p><b>Flujo neto =</b> margen total − cuotas: Bs {formatMoney(margenTotalOperativo)} − Bs {formatMoney(cuotasTotales)} = <strong>Bs {formatMoney(totalFlujoNeto)}</strong>.</p>{cargaFinanciera === null
+            ? <p>Con un margen no positivo no se calcula el porcentaje de carga. El resultado provisional es rechazo.</p>
+            : <p><b>Carga financiera =</b> cuotas ÷ margen × 100: Bs {formatMoney(cuotasTotales)} ÷ Bs {formatMoney(margenTotalOperativo)} × 100 = <strong>{formatMoney(cargaFinanciera)}%</strong>. Se compara con el límite de {limiteGarantia}%.</p>}</>}
+        </CalculationHelp></section>
+        <div className="form-footer section-selector-footer"><SectionSelectorButton onClick={() => setSectionsOpen(true)} dirty={dirty} /><button className="button primary large-button"><Save size={19} />Guardar</button></div>
       </form>
+      <SectionSelectorDialog open={sectionsOpen} onClose={() => setSectionsOpen(false)} solicitud={solicitud} dirty={dirty} />
     </div>
   )
 }

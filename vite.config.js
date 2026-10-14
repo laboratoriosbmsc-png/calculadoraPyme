@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         id: '/',
         name: 'Calculadora Pyme',
-        short_name: 'CalcuPyme',
+        short_name: 'Calculadora Pyme',
         description: 'Calculadora Pyme para la evaluación de solicitudes.',
         lang: 'es-BO',
         start_url: '/',

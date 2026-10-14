@@ -1,10 +1,13 @@
 import { ArrowLeft, Scale, Save } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import CalculationHelp from '../../components/CalculationHelp'
 import FieldErrorMark from '../../components/FieldErrorMark'
+import { SectionSelectorButton, SectionSelectorDialog } from '../../components/SectionSelector'
 import SaveToast from '../../components/SaveToast'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
+import { focusFirstInvalid } from '../../services/focusFirstInvalid'
 import { calcularLimiteFinanciamientoBalance, formatMoney, sumarCampos } from '../../services/calculos'
 import { BALANCE_ACTIVOS_FIELDS, BALANCE_PASIVOS_FIELDS, GARANTIAS_BALANCE } from '../../types/constants'
 
@@ -18,12 +21,14 @@ export default function BalanceGeneralPage() {
   const [errors, setErrors] = useState({})
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [sectionsOpen, setSectionsOpen] = useState(false)
   useUnsavedWarning(dirty)
 
   const totalActivos = useMemo(() => sumarCampos(campos, BALANCE_ACTIVOS_FIELDS.map(([name]) => name)), [campos])
   const totalPasivos = useMemo(() => sumarCampos(campos, BALANCE_PASIVOS_FIELDS.map(([name]) => name)), [campos])
   const totalPatrimonio = totalActivos - totalPasivos
   const limiteFinanciamiento = calcularLimiteFinanciamientoBalance(totalActivos, totalPasivos, campos.tipoGarantia)
+  const factorGarantia = campos.tipoGarantia === GARANTIAS_BALANCE[0] ? 2.5 : 1
   if (!solicitud) return <Missing />
 
   const change = (name, value) => {
@@ -33,7 +38,7 @@ export default function BalanceGeneralPage() {
     setErrors((current) => ({ ...current, [name]: '' }))
   }
 
-  const validate = () => {
+  const validate = (form) => {
     const next = {}
     ;[...BALANCE_ACTIVOS_FIELDS, ...BALANCE_PASIVOS_FIELDS].forEach(([name, label]) => {
       if (campos[name] === '') next[name] = `${label} es obligatorio.`
@@ -41,12 +46,13 @@ export default function BalanceGeneralPage() {
     })
     if (!campos.tipoGarantia) next.tipoGarantia = 'Selecciona un tipo de garantía.'
     setErrors(next)
+    focusFirstInvalid(form, next)
     return Object.keys(next).length === 0
   }
 
   const submit = (event) => {
     event.preventDefault()
-    if (!validate()) return
+    if (!validate(event.currentTarget)) return
     const finalActivos = sumarCampos(campos, BALANCE_ACTIVOS_FIELDS.map(([name]) => name))
     const finalPasivos = sumarCampos(campos, BALANCE_PASIVOS_FIELDS.map(([name]) => name))
     const finalLimit = calcularLimiteFinanciamientoBalance(finalActivos, finalPasivos, campos.tipoGarantia)
@@ -74,9 +80,16 @@ export default function BalanceGeneralPage() {
           </div>
           <fieldset className="guarantee-fieldset"><legend className="field-label">Tipo de Garantía para relación Deuda/Patrimonio</legend><div className="visible-choice-grid balance-guarantee-options">{GARANTIAS_BALANCE.map((garantia) => <label key={garantia} className={`visible-choice ${campos.tipoGarantia === garantia ? 'selected' : ''}`}><input type="radio" name="tipoGarantia" value={garantia} checked={campos.tipoGarantia === garantia} onChange={(event) => change('tipoGarantia', event.target.value)} /><span className="radio-control" /><strong>{garantia}</strong></label>)}</div>{errors.tipoGarantia && <p className="field-error">{errors.tipoGarantia}</p>}</fieldset>
           <div className="readonly-grid summary-readonly"><div className="readonly-field full-result"><span>Límite de Financiamiento</span><strong>{limiteFinanciamiento === null ? '—' : `Bs ${formatMoney(limiteFinanciamiento)}`}</strong></div></div>
+          <CalculationHelp>
+            <p>Patrimonio = activos − pasivos: Bs {formatMoney(totalActivos)} − Bs {formatMoney(totalPasivos)} = <strong>Bs {formatMoney(totalPatrimonio)}</strong>.</p>
+            {limiteFinanciamiento === null
+              ? <p>Selecciona un tipo de garantía para calcular el límite.</p>
+              : <p>Límite = patrimonio × {factorGarantia}: Bs {formatMoney(totalPatrimonio)} × {factorGarantia} = <strong>Bs {formatMoney(limiteFinanciamiento)}</strong>.</p>}
+          </CalculationHelp>
         </section>
-        <div className="form-footer right"><button className="button primary large-button"><Save size={19} />Guardar</button></div>
+        <div className="form-footer section-selector-footer"><SectionSelectorButton onClick={() => setSectionsOpen(true)} dirty={dirty} /><button className="button primary large-button"><Save size={19} />Guardar</button></div>
       </form>
+      <SectionSelectorDialog open={sectionsOpen} onClose={() => setSectionsOpen(false)} solicitud={solicitud} dirty={dirty} />
     </div>
   )
 }

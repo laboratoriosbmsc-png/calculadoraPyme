@@ -1,11 +1,14 @@
 import { ArrowLeft, BarChart3, Building, Building2, Factory, Save, Store } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import CalculationHelp from '../../components/CalculationHelp'
 import FieldErrorMark from '../../components/FieldErrorMark'
+import { SectionSelectorButton, SectionSelectorDialog } from '../../components/SectionSelector'
 import SaveToast from '../../components/SaveToast'
 import { useSolicitud } from '../../hooks/useSolicitudes'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
-import { calcularIndiceTamano, clasificarTamano, formatIndex } from '../../services/calculos'
+import { focusFirstInvalid } from '../../services/focusFirstInvalid'
+import { calcularIndiceTamano, clasificarTamano, formatIndex, formatMoney } from '../../services/calculos'
 import { SECTORES_CAEDEC, TAMANO_FIELDS } from '../../types/constants'
 
 const defaults = { sector: '', ingresosAnuales: '', patrimonio: '', personalOcupado: '' }
@@ -24,6 +27,7 @@ export default function TamanoActividadPage() {
   const [errors, setErrors] = useState({})
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [sectionsOpen, setSectionsOpen] = useState(false)
   useUnsavedWarning(dirty)
 
   const hasRequiredData = Boolean(campos.sector && TAMANO_FIELDS.every(([name]) => campos[name] !== ''))
@@ -31,6 +35,8 @@ export default function TamanoActividadPage() {
   const resultadoFinal = indice === null ? null : clasificarTamano(indice)
   const resultVisual = resultadoFinal ? RESULT_ICONS[resultadoFinal] : null
   const ResultIcon = resultVisual?.icon
+  const divisorFinanciero = campos.sector === 'Servicios' ? 31_000_000 : 52_000_000
+  const divisorPersonal = campos.sector === 'Servicios' ? 22 : 32
   if (!solicitud) return <Missing />
 
   const change = (name, value) => {
@@ -40,7 +46,7 @@ export default function TamanoActividadPage() {
     setErrors((current) => ({ ...current, [name]: '' }))
   }
 
-  const validate = () => {
+  const validate = (form) => {
     const next = {}
     if (!campos.sector) next.sector = 'Selecciona un sector CAEDEC.'
     TAMANO_FIELDS.forEach(([name, label]) => {
@@ -49,12 +55,13 @@ export default function TamanoActividadPage() {
       else if (!Number.isInteger(Number(campos[name]))) next[name] = 'Ingresa un número sin decimales.'
     })
     setErrors(next)
+    focusFirstInvalid(form, next)
     return Object.keys(next).length === 0
   }
 
   const submit = (event) => {
     event.preventDefault()
-    if (!validate()) return
+    if (!validate(event.currentTarget)) return
     const finalIndex = calcularIndiceTamano(campos)
     if (updateSolicitud(id, { tamanoActividad: { campos, indice: finalIndex, resultadoFinal: clasificarTamano(finalIndex) } })) {
       setDirty(false)
@@ -72,9 +79,43 @@ export default function TamanoActividadPage() {
 
         <section className="form-section surface"><div className="form-section-heading"><span>02</span><div><h2>Datos de la actividad</h2><p>Todos los campos son obligatorios y aceptan valores enteros.</p></div></div><div className="form-grid tamano-form-grid">{TAMANO_FIELDS.map(([name, label]) => <div className="field-group" key={name}><label className="field-label" htmlFor={name}>{label} <FieldErrorMark error={errors[name]} id={`${name}-error`} /></label><div className={`number-input ${errors[name] ? 'invalid' : ''}`}><input id={name} type="number" min="0" step="1" inputMode="numeric" value={campos[name]} onChange={(event) => change(name, event.target.value)} aria-invalid={Boolean(errors[name])} aria-describedby={errors[name] ? `${name}-error` : undefined} /><span>{name === 'personalOcupado' ? 'personas' : 'Bs'}</span></div></div>)}</div></section>
 
-        <section className="form-section surface"><div className="form-section-heading"><span>03</span><div><h2>Resultado de clasificación</h2><p>El índice se actualiza automáticamente con los datos ingresados.</p></div></div><div className="readonly-grid tamano-results-grid"><div className="readonly-field"><span>Índice</span><strong>{indice === null ? '—' : formatIndex(indice)}</strong></div><div className={`readonly-field tamano-result ${resultVisual?.color || 'pending'}`}><span>Resultado Final</span><strong>{resultVisual ? <><span className="tamano-result-icon" aria-hidden="true"><ResultIcon /></span>{resultadoFinal}</> : '—'}</strong></div></div></section>
-        <div className="form-footer right"><button className="button primary large-button"><Save size={19} />Guardar</button></div>
+        <section className="form-section surface">
+          <div className="form-section-heading">
+            <span>03</span>
+            <div>
+              <h2>Resultado de clasificación</h2>
+              <p>El índice se actualiza automáticamente con los datos ingresados.</p>
+            </div>
+          </div>
+          <div className="readonly-grid tamano-results-grid">
+            <div className="readonly-field">
+              <span>Índice</span>
+              <strong>{indice === null ? '—' : formatIndex(indice)}</strong>
+            </div>
+            <div className={`readonly-field tamano-result ${resultVisual?.color || 'pending'}`}>
+              <span>Resultado Final</span>
+              <strong>{resultVisual ? <>
+                <span className="tamano-result-icon" aria-hidden="true"><ResultIcon /></span>{resultadoFinal}</> : '—'}
+              </strong>
+            </div>
+          </div>
+          <CalculationHelp>{indice === null
+          ? <p>Selecciona un sector y completa los tres datos para ver el cálculo con tus importes.</p>
+          : <>
+          <p><b>Indice formula =</b> [(((Ingresos anuales + Patrimonio) / 2) / Denominador_financiero) * 0.6] + [(Personal Ocupado / Denominador_personal) * 0.4]  </p>
+
+          <p><b>Denominador_financiero =</b> 52,000,000 para Producción/Comercio o 31,000,000 para Servicios </p>
+          <p><b>Denominador_personal =</b> 32 para Producción/Comercio o 22 para Servicios</p>
+
+          <p><b>Indice =</b> (((Bs {formatMoney(campos.ingresosAnuales)} + Bs {formatMoney(campos.patrimonio)}) ÷ 2 ÷ {formatMoney(divisorFinanciero)}) × 0.6.) + ({campos.personalOcupado} ÷ {divisorPersonal}) × 0.4.</p>
+
+          <p><u>La suma da un índice de <strong>{formatIndex(indice)}</strong> y clasifica la actividad como <strong>{resultadoFinal}</strong>.<u/></u></p>
+          <p><b>Rangos =</b> Microempresa hasta 0.0350; Pequeña hasta 0.1150; Mediana hasta 1.0000; Gran Empresa por encima de 1.0000.</p></>}
+          </CalculationHelp>
+        </section>
+        <div className="form-footer section-selector-footer"><SectionSelectorButton onClick={() => setSectionsOpen(true)} dirty={dirty} /><button className="button primary large-button"><Save size={19} />Guardar</button></div>
       </form>
+      <SectionSelectorDialog open={sectionsOpen} onClose={() => setSectionsOpen(false)} solicitud={solicitud} dirty={dirty} />
     </div>
   )
 }

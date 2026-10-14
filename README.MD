@@ -1,4 +1,4 @@
  
 git add .
-git commit -m "Quita icono del nombre del solicitante"
+git commit -m "Ajustes varios"
 git push origin main

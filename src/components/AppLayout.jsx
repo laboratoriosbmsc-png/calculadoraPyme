@@ -71,7 +71,7 @@ export default function AppLayout() {
       <header className={`mobile-header ${headerHidden && !menuOpen ? 'hidden' : ''}`}>
         <button type="button" className="icon-button light" onClick={() => { setMenuOpen(!menuOpen); setHeaderHidden(false) }} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}>{menuOpen ? <X /> : <Menu />}</button>
         <div className="brand compact-brand"><span className="brand-mark"><Calculator /></span><strong>Calculadora <em>Pyme</em></strong></div>
-        {isSectionPage ? <button type="button" className="mobile-back-button" onClick={backToSolicitudes} aria-label="Volver a solicitudes"><ArrowLeft size={18} /><span>Volver</span></button> : <span className="mobile-header-spacer" aria-hidden="true" />}
+        {isSectionPage ? <button type="button" className="mobile-back-button" onClick={backToSolicitudes} aria-label="Volver a solicitudes"><ArrowLeft size={22} /></button> : <span className="mobile-header-spacer" aria-hidden="true" />}
       </header>
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="brand"><span className="brand-mark"><Calculator /></span><div><strong>Calculadora</strong><em>Pyme</em></div></div>
